@@ -1,0 +1,5 @@
+#!/bin/sh
+
+simulavr -g -d $1 -c $2 -P simulavr-disp 1>/dev/null 2>/dev/null & PID=$!
+avr-gdb -q -tui 2>/dev/null
+kill $PID 1>/dev/null 2>/dev/null
