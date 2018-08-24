@@ -7,8 +7,5 @@ test.hex: test.S
 test: test.hex
 	@avrdude -p m16 -c usbasp -U test.hex
 
-debug:
-	@utils/avrdbg atmega16 16000000
-
 clean:
 	@rm test.hex test
