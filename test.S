@@ -1,23 +1,30 @@
-; stack pointer register
+; stack pointer registers
 .equ	SPL, 0x3D
 .equ	SPH, 0x3E
 
 ; interrupt
 .equ	SREG, 0x3F
 .equ	GICR, 0x3B
-.equ	MCURC, 0x35
+.equ	MCUCR, 0x35
 
 ; PIN 7 -- LED 0
-; PIN 6 -- input voltage
+; PIN 6 -- intercom line status
 ; 0 -- on, 1 -- off
-; PIN 5 -- mic
+; PIN 5 -- microphone
 ; 0 -- off, 1 -- on
 ; PIN 4 -- open door
 ; 0 -- close, 1 -- open
-; PIN 3 -- трубка
+; PIN 3 -- off-hook button
 ; 0 -- on, 1 -- off
-; PIN 2 -- button
+; PIN 2 -- door open button
 ; 0 -- on, 1 -- off
+.equ	LED_P, 7
+.equ	VLT_P, 6
+.equ	MIC_P, 5
+.equ	DOR_P, 4
+.equ	BT0_P, 3
+.equ	BT1_P, 2
+
 .equ	PIND, 0x10
 .equ	DDRD, 0x11
 .equ	PORTD, 0x12
@@ -35,80 +42,42 @@ h_stat:
 
 vectors:
 	jmp	init
-	jmp	handset
-	jmp	open_door
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-	jmp	int_ign
-
-int_ign:
-	ret
+	jmp	open_door	; INT0
+	jmp	handset		; INT1
 
 init:
-	ldi	R16, 0b10110000	; DDRD
-	ldi	R17, 0b01001100	; PORTD
-	clr	R18		; SREG
+	cli
+
+	ldi	R16, (1 << LED_P) | (1 << MIC_P) | (1 << DOR_P)	; DDRD
+	ldi	R17, (1 << VLT_P) | (1 << BT0_P) | (1 << BT1_P)	; PORTD
+	clr	R18		; h_stat
 	ldi	R19, 0x5F	; SPL
 	ldi	R20, 0x04	; SPH
-	clr	R21		; GICR
-	clr	R22		; MCURC
+	ldi	R21, 0b10000000	; GICR
+	ldi	R22, 0b00001000 ; MCUCR
 
 	out	DDRD, R16
 	out	PORTD, R17
-	out	SREG, R18
+	sts	h_stat, R18
 	out	SPL, R19
 	out	SPH, R20
 	out	GICR, R21
-	out	MCURC, R22
+	out	MCUCR, R22
 
 main:
-	sbic	PIND, 6
+	sbic	PIND, VLT_P
 	jmp	main
 
 call:
-	ldi	R16, 0b10000000	; GICR
-	ldi	R17, 0b00001000 ; MCURC ; ожидаем снятия трубки
-
-	out	GICR, R16
-	out	MCURC, R17
-
 	sei
 	nop			; PWM music from CD
 
 led_blink:
-	sbi	PORTD, 7	; LED on
+	sbi	PORTD, LED_P	; LED on
 	call	delay
-	cbi	PORTD, 7	; LED off
+	cbi	PORTD, LED_P	; LED off
 	call	delay
 	jmp	led_blink
-
-delay:
-	ldi	R16, 255
-dly1:
-	ldi	R17, 255
-dly2:
-	dec	R17
-	brne	dly2
-
-	dec	R16
-	brne	dly1
-
-	ret
 
 ; interrupt 1
 handset:
@@ -119,31 +88,52 @@ handset:
 	out	SPH, R17
 
 	lds	R16, h_stat
-	cpi	R16, 0x01	; if handset is raised
-	breq	put
+	cpi	R16, 0x01	; if handset is raised,
+	breq	put		; then go to put
 
 raise:
 	ldi	R16, 0b11000000	; GICR
-	ldi	R17, 0b00001110	; MCURC
+	ldi	R17, 0b00001110	; MCUCR
 	ldi	R18, 0x01	; h_stat
 
 	out	GICR, R16
-	out	MCURC, R17
+	out	MCUCR, R17
 	sts	h_stat, R18
-	sbi	PORTD, 5	; mic on
+
+	sbi	PORTD, MIC_P	; mic on
+	sbi	PORTD, LED_P	; led on
+	cbi	PORTD, BT0_P
+
 	sei
 
 inf:
 	jmp	inf
 
 put:
-	ldi	R19, 0x00	; h_stat
-	sts	h_stat, R19
-
 	jmp	init
 
 ; interrupt 0
 open_door:
-	sbi	PORTD, 4
-	cbi	PORTD, 4
+	sbi	PORTD, DOR_P
+	call	delay
+	cbi	PORTD, DOR_P
+
+	reti
+
+delay:
+	ldi	R16, 8
+dly1:
+	ldi	R17, 255
+dly2:
+	ldi	R18, 255
+dly3:
+	dec	R18
+	brne	dly3
+
+	dec	R17
+	brne	dly2
+
+	dec	R16
+	brne	dly1
+
 	ret
