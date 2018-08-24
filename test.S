@@ -3,27 +3,16 @@
 .equ	SPH, 0x3E
 
 ; interrupt
-.equ	SREG, 0x3F
 .equ	GICR, 0x3B
 .equ	MCUCR, 0x35
 
-; PIN 7 -- LED 0
-; PIN 6 -- intercom line status
-; 0 -- on, 1 -- off
-; PIN 5 -- microphone
-; 0 -- off, 1 -- on
-; PIN 4 -- open door
-; 0 -- close, 1 -- open
-; PIN 3 -- off-hook button
-; 0 -- on, 1 -- off
-; PIN 2 -- door open button
-; 0 -- on, 1 -- off
-.equ	LED_P, 7
-.equ	VLT_P, 6
-.equ	MIC_P, 5
-.equ	DOR_P, 4
-.equ	BT0_P, 3
-.equ	BT1_P, 2
+; PORTD pins
+.equ	LED_P, 7	; LED
+.equ	VLT_P, 6	; intercom line status
+.equ	MIC_P, 5	; microphone
+.equ	DOR_P, 4	; door open signal
+.equ	BT0_P, 3	; off-hook button
+.equ	BT1_P, 2	; door open button
 
 .equ	PIND, 0x10
 .equ	DDRD, 0x11
