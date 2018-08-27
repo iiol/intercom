@@ -1,7 +1,7 @@
 .PHONY: test clean
 
 test.hex: test.S
-	@avr-gcc -g -gstabs -nostartfiles -mmcu=atmega16 -o test test.S
+	@avr-gcc -nostartfiles -mmcu=atmega16 -o test test.S
 	@avr-objcopy -O ihex test test.hex
 
 test: test.hex

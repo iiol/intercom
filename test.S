@@ -4,15 +4,16 @@
 
 ; interrupt
 .equ	GICR, 0x3B
+.equ	GIFR, 0x3A
 .equ	MCUCR, 0x35
 
 ; PORTD pins
 .equ	LED_P, 7	; LED
 .equ	VLT_P, 6	; intercom line status
-.equ	MIC_P, 5	; microphone
-.equ	DOR_P, 4	; door open signal
 .equ	BT0_P, 3	; off-hook button
 .equ	BT1_P, 2	; door open button
+.equ	MIC_P, 1	; microphone
+.equ	DOR_P, 0	; door open signal
 
 .equ	PIND, 0x10
 .equ	DDRD, 0x11
@@ -35,30 +36,32 @@ vectors:
 	jmp	handset		; INT1
 
 init:
-	cli
-
-	ldi	R16, (1 << LED_P) | (1 << MIC_P) | (1 << DOR_P)	; DDRD
-	ldi	R17, (1 << VLT_P) | (1 << BT0_P) | (1 << BT1_P)	; PORTD
+	ldi	R16, 0b10000011	; DDRD
+	ldi	R17, 0b01001100	; PORTD
 	clr	R18		; h_stat
 	ldi	R19, 0x5F	; SPL
 	ldi	R20, 0x04	; SPH
 	ldi	R21, 0b10000000	; GICR
 	ldi	R22, 0b00001000 ; MCUCR
 
-	out	DDRD, R16
-	out	PORTD, R17
-	sts	h_stat, R18
-	out	SPL, R19
-	out	SPH, R20
-	out	GICR, R21
-	out	MCUCR, R22
+	out	DDRD, R16	; set LED_P, MIC_P, DOR_P
+	out	PORTD, R17	; set LVT_P, BT0_P, BT1_P
+	sts	h_stat, R18	; clear h_stat
+	out	SPL, R19	; | set stack pointer to the end
+	out	SPH, R20	; |
+	out	GICR, R21	; enable INT1
+	out	MCUCR, R22	; INT1: falling edge
 
 main:
-	sbic	PIND, VLT_P
+	sbic	PIND, VLT_P	; check intercom line
 	jmp	main
 
 call:
-	sei
+	ldi	R16, 0b10000000
+
+	out	GIFR, R16	; | clear interrupt flag
+	sei			; | and enable interrupt
+
 	nop			; PWM music from CD
 
 led_blink:
@@ -72,28 +75,29 @@ led_blink:
 handset:
 	ldi	R16, 0x5F	; SPL
 	ldi	R17, 0x04	; SPH
+	lds	R18, h_stat
 
-	out	SPL, R16
-	out	SPH, R17
+	out	SPL, R16	; | set stack pointer to the end
+	out	SPH, R27	; |
 
-	lds	R16, h_stat
-	cpi	R16, 0x01	; if handset is raised,
-	breq	put		; then go to put
+	cpi	R18, 0x01	; | if handset is raised,
+	breq	put		; | then go to put
 
 raise:
-	ldi	R16, 0b11000000	; GICR
+	sbi	PORTD, MIC_P	; mic on
+	sbi	PORTD, LED_P	; LED on
+	cbi	PORTD, BT0_P
+
+	ldi	R16, 0b11000000	; GICR, GIFR
 	ldi	R17, 0b00001110	; MCUCR
 	ldi	R18, 0x01	; h_stat
 
-	out	GICR, R16
-	out	MCUCR, R17
-	sts	h_stat, R18
+	out	GICR, R16	; enable INT0 and INT1
+	out	MCUCR, R17	; INT1: rising edge, INT0: falling edge
+	sts	h_stat, R18	; set h_stat
 
-	sbi	PORTD, MIC_P	; mic on
-	sbi	PORTD, LED_P	; led on
-	cbi	PORTD, BT0_P
-
-	sei
+	out	GIFR, R16	; | clear interrupt flags
+	sei			; | and enable interrupt
 
 inf:
 	jmp	inf
